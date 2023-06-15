@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.CognitiveServices.Vision.ComputerVision;
 using Microsoft.Azure.CognitiveServices.Vision.ComputerVision.Models;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Primitives;
 using System.Net;
 using System.Text;
 using Tesseract;
@@ -11,11 +13,6 @@ namespace ImgToText.Data
     {
 
         private readonly ImgToTextDbContext context;
-
-        //private readonly string SubscriptionKey = "1beeaf17759a4e50b644d8d4e7736f02";
-        //private readonly string endpoint = "https://riddleimgtotext.cognitiveservices.azure.com/";
-
-        //string path = "C:\\Users\\Davyeedo\\Downloads\\Whatsapp\\360_F_182011806_mxcDzt9ckBYbGpxAne8o73DbyDHpXOe9.jpg";
 
         public TextToImgImpl(ImgToTextDbContext context)
         {
@@ -69,15 +66,35 @@ namespace ImgToText.Data
                 {
                     results = convertToText.Split(new string[] { "\n" }, StringSplitOptions.None);
 
-                    //string toTextExtraction = results[11].Substring(5); 
-                    //string toTextExtraction = results[11][5..];
-                    //string trackingIDTextExtraction = results[25][11..];
-
                     var findCourierIndex = Array.FindIndex(results, x => x.Contains("UPS GROUND"));
 
-                    //var findShipToIndex = Array.FindIndex(results, x => x.Contains("TO"));
+                    StringBuilder fromText = new();
+                    fromText.Append(results[0]
+                        + string.Empty
+                        + results[1]
+                        + string.Empty
+                        + results[2]
+                        + string.Empty
+                        + results[3]
+                        + string.Empty
+                        + results[4]
+                        + string.Empty
+                        + results[5]);
+
                     var findShipToIndex = Array.FindIndex(results, x => x.Contains("SHIP"));
-                    //var index = findShipToIndex is -1 ? Array.FindIndex(results, x => x.Contains("TO")) : findShipToIndex;
+
+                    StringBuilder toText = new();
+                    toText.Append(results[findShipToIndex].Equals(" ") ? results[findShipToIndex + 1] : results[findShipToIndex + 2]
+                        + string.Empty
+                        + results[findShipToIndex + 3]
+                        + string.Empty
+                        + results[findShipToIndex + 4]
+                        + string.Empty
+                        + results[findShipToIndex + 5]
+                        + string.Empty
+                        + results[findShipToIndex + 6]
+                        + string.Empty
+                        + results[findShipToIndex + 7]);
 
                     var findTrackingIdIndex = Array.FindIndex(results, x => x.Contains("TRACKING"));
 
@@ -85,12 +102,15 @@ namespace ImgToText.Data
                     {
                         Text = "",
                         Courier = results[findCourierIndex].ToString(),
-                        From = "",
-                        //To = toTextExtraction,
+                        From = fromText.ToString(),
+
                         //To = results[findShipToIndex].ToString() is " " ? results[index + 1].ToString() : results[findShipToIndex + 1],
-                        To = results[findShipToIndex].Equals(" ") ? results[findShipToIndex + 1] : results[findShipToIndex + 2],  //|| results[index + 1].ToString().Equals(" ") 
-                        //TrackingId = trackingIDTextExtraction
-                        TrackingId = results[findTrackingIdIndex][31..].ToString()
+                        //To = results[findShipToIndex].Equals(" ") ? results[findShipToIndex + 1] : results[findShipToIndex + 2],  //|| results[index + 1].ToString().Equals(" ") 
+                        //To = indexText,
+                        To = toText.ToString(),
+
+
+                        TrackingId = results[findTrackingIdIndex][^4..].ToString()
                     };
 
                     await context.TextData.AddAsync(textData);
@@ -108,25 +128,59 @@ namespace ImgToText.Data
                 {
                     results = convertToText.Split(new string[] { "\n" }, StringSplitOptions.None);
 
+                    var findCourierIndex = Array.FindIndex(results, x => x.Contains("USPS"));
+                    var courierText = results[findCourierIndex].Split(" ");
+
                     StringBuilder fromTextExtraction = new();
-                    fromTextExtraction.Append(results[18]);
-                    fromTextExtraction.Append(results[21]);
-                    fromTextExtraction.Append(results[22]);
+                    fromTextExtraction.Append(results[findCourierIndex + 2]
+                        + string.Empty
+                        + results[findCourierIndex + 3]
+                        + string.Empty 
+                        + string.Empty
+                        + results[findCourierIndex + 4]);
+
+                    //fromTextExtraction.Append(results[findCourierIndex + 3]);
+                    //fromTextExtraction.Append(results[findCourierIndex + 4]);
+
+                    var findShipToIndex = Array.FindIndex(results, x => x.Contains("SHIP"));
 
                     StringBuilder toTextExtraction = new();
-                    //string toFirstSubstring = results[26][6..];
-                    toTextExtraction.Append(results[26][6..]);
-                    toTextExtraction.Append("," + " ");
-                    toTextExtraction.Append(results[28] + "," + " ");
-                    toTextExtraction.Append(results[29]);
+                    toTextExtraction.Append(results[findShipToIndex + 1]
+                        + string.Empty
+                        + results[findShipToIndex + 2]
+                        + string.Empty
+                        + results[findShipToIndex + 3]
+                        + string.Empty
+                        + results[findShipToIndex + 4]
+                        + string.Empty
+                        + results[findShipToIndex + 5]
+                        + string.Empty
+                        + results[findShipToIndex + 6]);
+
+                    //toTextExtraction.Append(results[26][6..]);
+                    //toTextExtraction.Append("," + " ");
+                    //toTextExtraction.Append(results[28] + "," + " ");
+                    //toTextExtraction.Append(results[29]);
+
+                    var findTrackingIdIndex = Array.FindIndex(results, x => x.Contains("TRACKING"));
+                    var trackingId = string.Empty;
+
+                    for (int i = findTrackingIdIndex; i < results.Length; i++)
+                    {
+                        if (results[i].Length == 27)
+                        {
+                            trackingId = results[i];
+                            break;
+                        }
+                    }
 
                     TextData textData = new()
                     {
                         Text = "",
-                        Courier = "USPS",
+                        Courier = courierText[0].ToString(),
                         From = fromTextExtraction.ToString(),
                         To = toTextExtraction.ToString(),
-                        TrackingId = results[34]
+                        TrackingId = trackingId.ToString()  //results[34]
                     };
 
                     await context.TextData.AddAsync(textData);
