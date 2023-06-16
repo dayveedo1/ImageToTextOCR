@@ -10,9 +10,9 @@ namespace ImgToText.Controllers
     public class ImgToTextController : Controller
     {
 
-        private readonly IImageToText textToImg;
+        private readonly IImgToText textToImg;
 
-        public ImgToTextController(IImageToText textToImg)
+        public ImgToTextController(IImgToText textToImg)
         {
             this.textToImg = textToImg;
         }
