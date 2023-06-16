@@ -2,7 +2,7 @@
 
 namespace ImgToText.Data
 {
-    public interface ITextToImg
+    public interface IImgToText
     {
         public string ConvertImageToText(IFormFile file);
 

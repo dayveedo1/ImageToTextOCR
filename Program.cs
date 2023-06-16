@@ -32,7 +32,7 @@ builder.Services.AddCors(options =>
                });
 });
 
-builder.Services.AddScoped<IImageToText, TextToImgImpl>();
+builder.Services.AddScoped<IImgToText, ImgToTextImpl>();
 
 var app = builder.Build();
 

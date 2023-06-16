@@ -9,12 +9,12 @@ using Tesseract;
 
 namespace ImgToText.Data
 {
-    public class TextToImgImpl : ITextToImg
+    public class ImgToTextImpl : IImgToText
     {
 
         private readonly ImgToTextDbContext context;
 
-        public TextToImgImpl(ImgToTextDbContext context)
+        public ImgToTextImpl(ImgToTextDbContext context)
         {
             this.context = context;
         }
@@ -70,30 +70,30 @@ namespace ImgToText.Data
 
                     StringBuilder fromText = new();
                     fromText.Append(results[0]
-                        + string.Empty
+                        + " "
                         + results[1]
-                        + string.Empty
+                        + " "
                         + results[2]
-                        + string.Empty
+                        + " "
                         + results[3]
-                        + string.Empty
+                        + " "
                         + results[4]
-                        + string.Empty
+                        + " "
                         + results[5]);
 
                     var findShipToIndex = Array.FindIndex(results, x => x.Contains("SHIP"));
 
                     StringBuilder toText = new();
                     toText.Append(results[findShipToIndex].Equals(" ") ? results[findShipToIndex + 1] : results[findShipToIndex + 2]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 3]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 4]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 5]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 6]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 7]);
 
                     var findTrackingIdIndex = Array.FindIndex(results, x => x.Contains("TRACKING"));
@@ -103,13 +103,7 @@ namespace ImgToText.Data
                         Text = "",
                         Courier = results[findCourierIndex].ToString(),
                         From = fromText.ToString(),
-
-                        //To = results[findShipToIndex].ToString() is " " ? results[index + 1].ToString() : results[findShipToIndex + 1],
-                        //To = results[findShipToIndex].Equals(" ") ? results[findShipToIndex + 1] : results[findShipToIndex + 2],  //|| results[index + 1].ToString().Equals(" ") 
-                        //To = indexText,
                         To = toText.ToString(),
-
-
                         TrackingId = results[findTrackingIdIndex][^4..].ToString()
                     };
 
@@ -133,10 +127,10 @@ namespace ImgToText.Data
 
                     StringBuilder fromTextExtraction = new();
                     fromTextExtraction.Append(results[findCourierIndex + 2]
-                        + string.Empty
+                        + " "
                         + results[findCourierIndex + 3]
-                        + string.Empty 
-                        + string.Empty
+                        + " "
+                        + " "
                         + results[findCourierIndex + 4]);
 
                     //fromTextExtraction.Append(results[findCourierIndex + 3]);
@@ -146,21 +140,16 @@ namespace ImgToText.Data
 
                     StringBuilder toTextExtraction = new();
                     toTextExtraction.Append(results[findShipToIndex + 1]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 2]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 3]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 4]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 5]
-                        + string.Empty
+                        + " "
                         + results[findShipToIndex + 6]);
-
-                    //toTextExtraction.Append(results[26][6..]);
-                    //toTextExtraction.Append("," + " ");
-                    //toTextExtraction.Append(results[28] + "," + " ");
-                    //toTextExtraction.Append(results[29]);
 
                     var findTrackingIdIndex = Array.FindIndex(results, x => x.Contains("TRACKING"));
                     var trackingId = string.Empty;
@@ -168,10 +157,8 @@ namespace ImgToText.Data
                     for (int i = findTrackingIdIndex; i < results.Length; i++)
                     {
                         if (results[i].Length == 27)
-                        {
                             trackingId = results[i];
-                            break;
-                        }
+                        break;
                     }
 
                     TextData textData = new()
@@ -194,30 +181,118 @@ namespace ImgToText.Data
                     };
                 }
 
-                if (convertToText.Contains("FedEx"))
+                if (convertToText.Contains("FedEx") || convertToText.Contains("Express"))
                 {
                     results = convertToText.Split(new string[] { "\n" }, StringSplitOptions.None);
 
+                    var findShRapaIndex = Array.FindIndex(results, x => x.Contains("SH RAPA") || x.Contains("SH "));
+                    var trackingIdText = string.Empty;
+
+                    for (int i = findShRapaIndex - 1; i < findShRapaIndex; i--)
+                    {
+                        if (results[i].Length > 14 && !results[i].Equals(""))
+                        {
+                            trackingIdText = results[i];
+                            break;
+                        }
+                    }
+
+                    var splitTrackingId = trackingIdText.Split(" ");
+                    StringBuilder trackingId = new();
+                    var trackingIdTextBuilder = splitTrackingId[0].Length < 4 ? trackingId.Append(splitTrackingId[1]
+                        + " "
+                        + splitTrackingId[2]
+                        + " "
+                        + splitTrackingId[3]) :
+
+                        trackingId.Append(splitTrackingId[0]
+                        + " "
+                        + splitTrackingId[1]
+                        + " "
+                        + splitTrackingId[2]);
+
+                    var trackToIndex = Array.FindIndex(results, x => x.Contains("|||||||") || x.Contains("IIIIIII"));
+                    StringBuilder toText = new();
+
+                    for (int i = trackToIndex - 1; i < trackToIndex; i--)
+                    {
+                        if (results[i].Contains("STATES US"))
+                            break;
+
+                        toText.Append(results[i] + " ");
+                    }
+
+                    string toTextStr = toText.ToString();
+                    var splitToTextStr = toTextStr.Split(" ");
+
+                    var finalToStr = splitToTextStr.Reverse();
+                    var strToText = String.Join(" ", finalToStr);
+
+                    var trackFromTextIndex = Array.FindIndex(results, x => x.Contains("ORIGIN"));
+
+                    StringBuilder fromText = new();
+
+                    for (int i = trackFromTextIndex + 1; i < results.Length; i++)
+                    {
+                        if (results[i].Contains("STATES US"))
+                            break;
+
+                        fromText.Append(results[i] + " ");
+                    }
+
+                    var fromTextStr = fromText.ToString();
+                    var splitFromText = fromTextStr.Split(" ");
+
+                    for (int i = 0; i < splitFromText.Count(); i++)
+                    {
+                        if (splitFromText[i].Contains("ACTW"))
+                        {
+                            splitFromText[i] = " ";
+                            splitFromText[i + 1] = " ";
+                            splitFromText[i + 2] = " ";
+                            splitFromText[i + 3] = " ";
+                            splitFromText[i + 4] = " ";
+                            break;
+                        }
+                        continue;
+                    }
+
+                    var finalFromStr = String.Join(" ", splitFromText);
+
+                    TextData textData = new()
+                    {
+                        Text = "",
+                        Courier = "FedEx",
+                        From = finalFromStr.ToString(),
+                        To = strToText.ToString(),
+                        //TrackingId = trackingId.ToString()
+                        TrackingId = trackingIdTextBuilder.ToString()
+                    };
+
+                    await context.TextData.AddAsync(textData);
+                    await context.SaveChangesAsync();
+
+                    return new ViewApiResponse
+                    {
+                        ResponseCode = 200,
+                        ResponseMessage = "Success",
+                        ResponseData = textData
+                    };
                 }
 
+                //TextData data = new()
+                //{
+                //    Text = convertToText
+                //};
 
-                //string[] results = convertToText.Split(new string[] { "\n" }, StringSplitOptions.None);
-                //convertToText.Split("\n\n");
-                //strings.Add()
-
-                TextData data = new()
-                {
-                    Text = convertToText
-                };
-
-                await context.TextData.AddAsync(data);
-                await context.SaveChangesAsync();
+                //await context.TextData.AddAsync(data);
+                //await context.SaveChangesAsync();
 
                 return new ViewApiResponse
                 {
-                    ResponseCode = 200,
-                    ResponseMessage = "Success",
-                    ResponseData = data
+                    ResponseCode = 400,
+                    ResponseMessage = "Bad Request",
+                    ResponseData = { }
                 };
             }
             catch (Exception ex)
