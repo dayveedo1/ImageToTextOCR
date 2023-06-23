@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.CognitiveServices.Vision.ComputerVision;
 using Microsoft.Azure.CognitiveServices.Vision.ComputerVision.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Primitives;
+using System.Linq;
 using System.Net;
 using System.Text;
 using Tesseract;
@@ -55,7 +57,6 @@ namespace ImgToText.Data
                     ResponseData = { }
                 };
 
-
             try
             {
                 var convertToText = ConvertImageToText(file);
@@ -68,33 +69,50 @@ namespace ImgToText.Data
 
                     var findCourierIndex = Array.FindIndex(results, x => x.Contains("UPS GROUND"));
 
-                    StringBuilder fromText = new();
-                    fromText.Append(results[0]
-                        + " "
-                        + results[1]
-                        + " "
-                        + results[2]
-                        + " "
-                        + results[3]
-                        + " "
-                        + results[4]
-                        + " "
-                        + results[5]);
-
                     var findShipToIndex = Array.FindIndex(results, x => x.Contains("SHIP"));
 
+                    StringBuilder fromText = new();
+
+                    for (int i = 0; i < findShipToIndex; i++)
+                    {
+                        if (i >= findShipToIndex)
+                            break;
+
+                        fromText.Append(results[i] + " ");
+                    }
+
                     StringBuilder toText = new();
-                    toText.Append(results[findShipToIndex].Equals(" ") ? results[findShipToIndex + 1] : results[findShipToIndex + 2]
-                        + " "
-                        + results[findShipToIndex + 3]
-                        + " "
-                        + results[findShipToIndex + 4]
-                        + " "
-                        + results[findShipToIndex + 5]
-                        + " "
-                        + results[findShipToIndex + 6]
-                        + " "
-                        + results[findShipToIndex + 7]);
+
+                    if (results[findShipToIndex + 1].Equals(""))
+                    {
+                        toText.Append(
+                            results[findShipToIndex + 2]
+                            + " "
+                            + results[findShipToIndex + 3]
+                            + " "
+                            + results[findShipToIndex + 4]
+                            + " "
+                            + results[findShipToIndex + 5]
+                            + " "
+                            + results[findShipToIndex + 6]
+                            + " "
+                            + results[findShipToIndex + 7]);
+                    }
+                    else
+                    {
+                        toText.Append(
+                            results[findShipToIndex + 1]
+                            + " "
+                            + results[findShipToIndex + 2]
+                            + " "
+                            + results[findShipToIndex + 3]
+                            + " "
+                            + results[findShipToIndex + 4]
+                            + " "
+                            + results[findShipToIndex + 5]
+                            + " "
+                            + results[findShipToIndex + 6]);
+                    }
 
                     var findTrackingIdIndex = Array.FindIndex(results, x => x.Contains("TRACKING"));
 
@@ -133,32 +151,31 @@ namespace ImgToText.Data
                         + " "
                         + results[findCourierIndex + 4]);
 
-                    //fromTextExtraction.Append(results[findCourierIndex + 3]);
-                    //fromTextExtraction.Append(results[findCourierIndex + 4]);
-
-                    var findShipToIndex = Array.FindIndex(results, x => x.Contains("SHIP"));
+                    var findTrackingIdIndex = Array.FindIndex(results, x => x.Contains("TRACKING"));
+                    var startingIndexforToTextData = findTrackingIdIndex - 8;
 
                     StringBuilder toTextExtraction = new();
-                    toTextExtraction.Append(results[findShipToIndex + 1]
-                        + " "
-                        + results[findShipToIndex + 2]
-                        + " "
-                        + results[findShipToIndex + 3]
-                        + " "
-                        + results[findShipToIndex + 4]
-                        + " "
-                        + results[findShipToIndex + 5]
-                        + " "
-                        + results[findShipToIndex + 6]);
 
-                    var findTrackingIdIndex = Array.FindIndex(results, x => x.Contains("TRACKING"));
+                    for (int i = startingIndexforToTextData; i < findTrackingIdIndex; i++)
+                    {
+
+                        if (results[i].Equals(findTrackingIdIndex))
+                            break;
+
+                        toTextExtraction.Append(results[i].ToString() + " ");
+                    }
+
                     var trackingId = string.Empty;
 
                     for (int i = findTrackingIdIndex; i < results.Length; i++)
                     {
                         if (results[i].Length == 27)
+                        {
                             trackingId = results[i];
-                        break;
+                            break;
+                        }
+
+                        continue;
                     }
 
                     TextData textData = new()
@@ -181,16 +198,16 @@ namespace ImgToText.Data
                     };
                 }
 
-                if (convertToText.Contains("FedEx") || convertToText.Contains("Express"))
+                if (convertToText.Contains("FedEx") || convertToText.Contains("Express") || convertToText.Contains("EXPRESS"))
                 {
                     results = convertToText.Split(new string[] { "\n" }, StringSplitOptions.None);
 
-                    var findShRapaIndex = Array.FindIndex(results, x => x.Contains("SH RAPA") || x.Contains("SH "));
+                    var findShRapaIndex = Array.FindIndex(results, x => x.Contains("SH RAPA") || x.Contains("RAPA"));  //|| x.Contains("SH ")
                     var trackingIdText = string.Empty;
 
                     for (int i = findShRapaIndex - 1; i < findShRapaIndex; i--)
                     {
-                        if (results[i].Length > 14 && !results[i].Equals(""))
+                        if (results[i].Length >= 14 && !results[i].Equals(""))
                         {
                             trackingIdText = results[i];
                             break;
@@ -211,30 +228,53 @@ namespace ImgToText.Data
                         + " "
                         + splitTrackingId[2]);
 
-                    var trackToIndex = Array.FindIndex(results, x => x.Contains("|||||||") || x.Contains("IIIIIII"));
-                    StringBuilder toText = new();
+                    var findBillSenderTextIndex = Array.FindIndex(results, x => x.Contains("BILL SENDER"));
+                    var qrcodeIndex = Array.FindIndex(results, x => x.Contains("|||||||") || x.Contains("IIIIIII") || x.Contains("Illll"));
+                    StringBuilder totext = new();
 
-                    for (int i = trackToIndex - 1; i < trackToIndex; i--)
+                    for (int i = findBillSenderTextIndex + 1; i < qrcodeIndex; i++)
                     {
-                        if (results[i].Contains("STATES US"))
-                            break;
+                        //if (i > findBillSenderTextIndex)
+                        //    break;
 
-                        toText.Append(results[i] + " ");
+                        totext.Append(results[i] + " ");
                     }
 
-                    string toTextStr = toText.ToString();
-                    var splitToTextStr = toTextStr.Split(" ");
+                    //var trackToIndex = Array.FindIndex(results, x => x.Contains("|||||||") || x.Contains("IIIIIII") || x.Contains("Illll"));
+                    //StringBuilder toText = new();
 
-                    var finalToStr = splitToTextStr.Reverse();
-                    var strToText = String.Join(" ", finalToStr);
+                    //for (int i = trackToIndex - 1; i < trackToIndex; i--)
+                    //{
+                    //    if (results[i].Contains("STATES US"))
+                    //        break;
 
-                    var trackFromTextIndex = Array.FindIndex(results, x => x.Contains("ORIGIN"));
+                    //    toText.Append(results[i] + " ");
+                    //}
+
+                    //string toTextStr = toText.ToString();
+                    //var splitToTextStr = toTextStr.Split(" ");
+
+                    //var finalToStr = splitToTextStr.Reverse();
+                    //var strToText = String.Join(" ", finalToStr);
+
+                    ;
+
+                    //var trackFromTextIndex = Array.FindIndex(results, x => x.Contains("ORIGIN"));
+
 
                     StringBuilder fromText = new();
 
-                    for (int i = trackFromTextIndex + 1; i < results.Length; i++)
+                    //for (int i = trackFromTextIndex + 1; i < results.Length; i++)
+                    //{
+                    //    if (results[i].Contains("STATES US"))
+                    //        break;
+
+                    //    fromText.Append(results[i] + " ");
+                    //}
+
+                    for (int i = 0; i <= findBillSenderTextIndex; i++)
                     {
-                        if (results[i].Contains("STATES US"))
+                        if (results[i].Contains("STATES US") || i > findBillSenderTextIndex)
                             break;
 
                         fromText.Append(results[i] + " ");
@@ -245,7 +285,7 @@ namespace ImgToText.Data
 
                     for (int i = 0; i < splitFromText.Count(); i++)
                     {
-                        if (splitFromText[i].Contains("ACTW"))
+                        if (splitFromText[i].Contains("ACTW") || splitFromText[i].Contains("AC"))
                         {
                             splitFromText[i] = " ";
                             splitFromText[i + 1] = " ";
@@ -264,7 +304,8 @@ namespace ImgToText.Data
                         Text = "",
                         Courier = "FedEx",
                         From = finalFromStr.ToString(),
-                        To = strToText.ToString(),
+                        //To = strToText.ToString(),
+                        To = totext.ToString(),
                         //TrackingId = trackingId.ToString()
                         TrackingId = trackingIdTextBuilder.ToString()
                     };
@@ -279,14 +320,6 @@ namespace ImgToText.Data
                         ResponseData = textData
                     };
                 }
-
-                //TextData data = new()
-                //{
-                //    Text = convertToText
-                //};
-
-                //await context.TextData.AddAsync(data);
-                //await context.SaveChangesAsync();
 
                 return new ViewApiResponse
                 {
@@ -305,6 +338,170 @@ namespace ImgToText.Data
                 };
             }
 
+        }
+
+        public async Task<ViewApiResponse> GetAllRecords()
+        {
+            try
+            {
+                var result = await context.TextData.ToListAsync();
+                return new ViewApiResponse
+                {
+                    ResponseCode = 200,
+                    ResponseMessage = "Success",
+                    ResponseData = result
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ViewApiResponse
+                {
+                    ResponseCode = 500,
+                    ResponseMessage = $"Internal Server Error, {ex.Message}",
+                    ResponseData = { }
+                };
+            }
+        }
+
+        public async Task<ViewApiResponse> GetRecordsByTrackingId(string trackingId)
+        {
+            if (string.IsNullOrEmpty(trackingId))
+            {
+                return new ViewApiResponse
+                {
+                    ResponseCode = 400,
+                    ResponseMessage = "Bad Request, Please input a valid tracking ID",
+                    ResponseData = { }
+                };
+
+            }
+
+            try
+            {
+                var response = await context.TextData.Where(x => x.TrackingId.Contains(trackingId)).ToListAsync();
+
+                if (response.Count.Equals(0) || response is null)
+                {
+                    return new ViewApiResponse
+                    {
+                        ResponseCode = 404,
+                        ResponseMessage = $"{trackingId} Not Found",
+                        ResponseData = { }
+                    };
+                }
+
+                return new ViewApiResponse
+                {
+                    ResponseCode = 200,
+                    ResponseMessage = "Success",
+                    ResponseData = response
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ViewApiResponse
+                {
+                    ResponseCode = 500,
+                    ResponseMessage = $"Internal Server Error, {ex.Message}",
+                    ResponseData = { }
+                };
+            }
+
+        }
+
+        public async Task<ViewApiResponse> GetRecordById(int id)
+        {
+            if (id.Equals(null))
+            {
+                return new ViewApiResponse
+                {
+                    ResponseCode = 400,
+                    ResponseMessage = "Bad Request",
+                    ResponseData = { }
+                };
+            }
+
+            try
+            {
+                var response = await context.TextData.Where(x => x.Id == id).FirstOrDefaultAsync();
+                if (response is null)
+                {
+                    return new ViewApiResponse
+                    {
+                        ResponseCode = 404,
+                        ResponseMessage = "Not Found",
+                        ResponseData = { }
+                    };
+                }
+
+                return new ViewApiResponse
+                {
+                    ResponseCode = 200,
+                    ResponseMessage = "Success",
+                    ResponseData = response
+                };
+            } catch (Exception ex)
+            {
+                return new ViewApiResponse
+                {
+                    ResponseCode = 500,
+                    ResponseMessage = $"Internal Server Error, {ex.Message}",
+                    ResponseData = { }
+                };
+            }
+
+            
+
+        }
+
+        public async Task<ViewApiResponse> UpdateRecordByTrackingId(TextDataDTO data)
+        {
+            if (string.IsNullOrEmpty(data.TrackingId))
+            {
+                return new ViewApiResponse
+                {
+                    ResponseCode = 400,
+                    ResponseMessage = "Bad Request, Please input a valid tracking ID",
+                    ResponseData = { }
+                };
+            }
+
+            try
+            {
+                var response = await context.TextData.Where(x => x.Id.Equals(data.Id)).FirstOrDefaultAsync();
+                if (response is null)
+                {
+                    return new ViewApiResponse
+                    {
+                        ResponseCode = 404,
+                        ResponseMessage = $"{data.Id} Not Found",
+                        ResponseData = response
+                    };
+                }
+
+                var entityTobeModified = response;
+                entityTobeModified.Courier = data.Courier;
+                entityTobeModified.From = data.From;
+                entityTobeModified.To = data.To;
+
+                context.Entry(entityTobeModified).State = EntityState.Detached;
+                context.Entry(entityTobeModified).State = EntityState.Modified;
+                await context.SaveChangesAsync();
+
+                var result = await GetRecordsByTrackingId(data.TrackingId);
+                return result;
+
+
+            }
+            catch (Exception ex)
+            {
+                return new ViewApiResponse
+                {
+                    ResponseCode = 500,
+                    ResponseMessage = $"Internal Server Error, {ex.Message}",
+                    ResponseData = { }
+                };
+            }
         }
 
 

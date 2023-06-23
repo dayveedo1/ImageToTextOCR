@@ -13,6 +13,6 @@ namespace ImgToText.Data
         public string? From { get; set; }
         public string? To { get; set; }
         [Column("TrackingID")]
-        public string? TrackingId { get; set; }
+        public string TrackingId { get; set; }
     }
 }
